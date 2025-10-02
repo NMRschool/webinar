@@ -1,0 +1,16 @@
+BEGIN:VCALENDAR
+PRODID:-//LatAm NMR School//Webinar//ES
+VERSION:2.0
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+BEGIN:VEVENT
+UID:latam-nmr-20251002T194205Z@nmrschool.com
+DTSTAMP:20251002T194205Z
+DTSTART:20251126T160000Z
+DTEND:20251126T170000Z
+SUMMARY:WEBINAR — El Arte del Desacoplamiento en RMN (LatAm NMR School)
+LOCATION:Zoom
+DESCRIPTION:Ponente: Dr. Adolfo Botana (JEOL)\nTema: El Arte del Desacoplamiento en Resonancia Magnética Nuclear\nOrganiza: LatAm NMR School\n\nUnirse a la reunión Zoom: https://redanahuac.zoom.us/j/86761915216\nID de reunión: 867 6191 5216\nCódigo de acceso: LtG3#x / 643917\n\nMás info: www.nmrschool.com
+URL:https://redanahuac.zoom.us/j/86761915216
+END:VEVENT
+END:VCALENDAR
