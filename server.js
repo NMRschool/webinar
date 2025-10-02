@@ -3,6 +3,7 @@ const path = require('path');
 const fs   = require('fs');
 const nodemailer = require('nodemailer');
 
+
 const NMR_EVENT = {
   title: 'WEBINAR — El Arte del Desacoplamiento en RMN (LatAm NMR School)',
   // 26 nov 2025 10:00 AM America/Mexico_City = 16:00Z (1 h)
@@ -100,6 +101,8 @@ app.post('/nmrschool/register', async (req, res) => {
       return res.status(400).json({ ok:false, error:'firstName, lastName y email son obligatorios.' });
     }
 
+
+
     // QR directo al Zoom (puedes cambiarlo a QR de VEvent si prefieres)
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(NMR_EVENT.zoomUrl)}`;
 
@@ -144,3 +147,5 @@ app.post('/nmrschool/register', async (req, res) => {
     res.status(500).json({ ok:false, error:'Error en el servidor.' });
   }
 });
+
+app.get('/healthz', (_,res)=>res.send('ok'));
