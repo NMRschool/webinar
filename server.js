@@ -149,6 +149,20 @@ function renderTemplate(tpl, vars) {
   );
 }
 
+// antes de tus rutas:
+app.get('/diag', (_req,res) => {
+  const diag = {
+    tplExists: false,
+    nmrTplPath: NMR_TPL_PATH,
+    hasSmtpUser: !!process.env.SMTP_USER,
+    hasSmtpPass: !!process.env.SMTP_PASS,
+    mailFrom: process.env.MAIL_FROM || null,
+    icsPublicUrl: typeof ICS_PUBLIC_URL !== 'undefined'
+  };
+  try { diag.tplExists = require('fs').existsSync(NMR_TPL_PATH); } catch {}
+  res.json(diag);
+});
+
 // Plantilla del correo de invitación (ajusta la ruta si la pones en otro lugar)
 const NMR_TPL_PATH = process.env.NMR_TPL_PATH || path.join(__dirname, 'correo_ticket.html');
 
@@ -215,7 +229,7 @@ app.post('/nmrschool/register', async (req, res) => {
     res.json({ ok:true, message:'Registro exitoso. Te enviamos tu invitación y .ics por correo.' });
   } catch (err) {
     console.error('[ERROR] /nmrschool/register:', err);
-    res.status(500).json({ ok:false, error:'Error en el servidor.' });
+    res.status(500).json({ ok:false, error:'Error en el servidor.', detail: String(err.message || err) });
   }
 });
 
