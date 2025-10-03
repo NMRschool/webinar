@@ -114,8 +114,8 @@ function buildIcsWebinar() {
 // SMTP (Gmail) — mismo esquema que ya usas con nodemailer y adjuntos .ics. :contentReference[oaicite:3]{index=3}
 async function sendMailSmtp({ to, bcc, subject, html, icsBuffer }) {
   const host = process.env.SMTP_HOST || 'smtp.gmail.com';
-  const user = process.env.SMTP_USER;  // ej. contacto@nmrschool.com
-  const pass = process.env.SMTP_PASS;  // APP PASSWORD de Gmail
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
   const from = process.env.MAIL_FROM || user;
   if (!host || !user || !pass) throw new Error('SMTP faltante');
 
@@ -125,19 +125,34 @@ async function sendMailSmtp({ to, bcc, subject, html, icsBuffer }) {
     contentType: 'text/calendar; charset=utf-8; method=PUBLISH'
   }] : [];
 
+  const nodemailer = require('nodemailer');
+
   const trySend = async (port, secure) => {
     const transporter = nodemailer.createTransport({
-      host, port, secure, auth: { user, pass },
-      requireTLS: !secure, tls: { servername: host }
+      host,
+      port,
+      secure,                // false => STARTTLS en 587; true => TLS directo en 465
+      auth: { user, pass },
+      requireTLS: !secure,   // fuerza STARTTLS cuando secure=false
+      family: 4,             // <-- fuerza IPv4 (evita problemas IPv6)
+      connectionTimeout: 20000,
+      greetingTimeout: 20000,
+      socketTimeout: 20000,
+      tls: {
+        minVersion: 'TLSv1.2',
+        servername: host
+      }
     });
     return transporter.sendMail({ from, to, bcc, subject, html, attachments });
   };
 
+  // 1) PRIMERO intenta 587 STARTTLS
   try {
-    return await trySend(Number(process.env.SMTP_PORT || 465), true);
-  } catch (e) {
-    // fallback STARTTLS 587 (mismo patrón de retry que usas) :contentReference[oaicite:4]{index=4}
     return await trySend(587, false);
+  } catch (e1) {
+    console.warn('[SMTP] 587/STARTTLS falló:', e1.code || e1.message);
+    // 2) FALLBACK: 465 TLS directo
+    return await trySend(465, true);
   }
 }
 
