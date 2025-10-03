@@ -1,8 +1,70 @@
 // ======== NMR School — Webinar RMN ========
+
+// --- bootstrap básico ---
+require('dotenv').config();
+const express = require('express');
+const app = express();
+
+const cors = require('cors');
+
+app.use(cors({
+  origin: [
+    'https://nmrschool.github.io',
+    'https://nmrschool.github.io/webinar',
+    'https://nmrschool.github.io' // cubre rutas internas
+  ],
+  methods: ['POST','GET'],
+  allowedHeaders: ['Content-Type']
+}));
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(express.static('public')); // sirve tu /public (index.html)
+
+
 const path = require('path');
+
+
 const fs   = require('fs');
 const nodemailer = require('nodemailer');
 
+const DATA_DIR = path.join(__dirname, 'data');
+const DATA_FILE = path.join(DATA_DIR, 'registrants.json');
+
+// Carga inicial de registros (si existe archivo)
+let registrants = [];
+try {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+  if (fs.existsSync(DATA_FILE)) {
+    registrants = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+  }
+} catch (e) {
+  console.error('No se pudo cargar registrants.json:', e);
+}
+
+// Guardado helper
+function saveRegistrants() {
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(registrants, null, 2), 'utf8');
+  } catch (e) {
+    console.error('No se pudo guardar registrants.json:', e);
+  }
+}
+
+// CSV helper
+function toCSV(rows) {
+  if (!rows.length) return 'firstName,lastName,orgType,orgName,role,email,phone,moreInfo,createdAt\n';
+  const headers = Object.keys(rows[0]);
+  const escape = v => `"${String(v ?? '').replaceAll('"','""')}"`;
+  const lines = [headers.join(',')];
+  for (const r of rows) lines.push(headers.map(h => escape(r[h])).join(','));
+  return lines.join('\n');
+}
+
+
+// URL pública (RAW) del ICS en GitHub
+const ICS_PUBLIC_URL = process.env.ICS_PUBLIC_URL 
+  || 'https://raw.githubusercontent.com/NMRschool/webinar/main/nmrschool_webinar.ics';
 
 const NMR_EVENT = {
   title: 'WEBINAR — El Arte del Desacoplamiento en RMN (LatAm NMR School)',
@@ -101,6 +163,14 @@ app.post('/nmrschool/register', async (req, res) => {
       return res.status(400).json({ ok:false, error:'firstName, lastName y email son obligatorios.' });
     }
 
+     // Guarda en memoria y archivo
+    registrants.unshift({
+    firstName, lastName, orgType, orgName, role, email,
+    phone: phone || '',
+    moreInfo: !!moreInfo,
+    createdAt: new Date().toISOString()
+    });
+    saveRegistrants();
 
 
     // QR directo al Zoom (puedes cambiarlo a QR de VEvent si prefieres)
@@ -123,7 +193,8 @@ app.post('/nmrschool/register', async (req, res) => {
       pass2: NMR_EVENT.pass2,
       // fecha/hora para el cuerpo del correo
       dateText: 'Miércoles 26 de noviembre de 2025 · 10:00 AM (CDMX)',
-      qrUrl
+      qrUrl,
+      icsUrl: ICS_PUBLIC_URL
     });
 
     // ICS
@@ -148,4 +219,25 @@ app.post('/nmrschool/register', async (req, res) => {
   }
 });
 
+// JSON completo
+app.get('/nmrschool/registrants', (_, res) => {
+  res.json({ ok: true, count: registrants.length, data: registrants });
+});
+
+// CSV
+app.get('/nmrschool/registrants.csv', (_, res) => {
+  const csv = toCSV(registrants);
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="registrants.csv"');
+  res.send(csv);
+});
+
+
+app.get('/', (_, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
 app.get('/healthz', (_,res)=>res.send('ok'));
+
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () => {
+  console.log(`NMR School webinar server listening on ${PORT}`);
+});
