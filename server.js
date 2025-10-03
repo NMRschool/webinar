@@ -163,8 +163,8 @@ async function sendMailBrevoHttp({ to, subject, html, icsBuffer, bcc }) {
     req.on('timeout', () => req.destroy(new Error('Brevo HTTP timeout')));
     req.write(data);
     req.end();
-  });
-}
+});
+};
 // SMTP (Gmail) — mismo esquema que ya usas con nodemailer y adjuntos .ics. :contentReference[oaicite:3]{index=3}
 // Reemplaza tu bloque trySend + llamada por esta función única (más simple y robusta para Brevo)
 //async function sendMailSmtp({ to, bcc, subject, html, icsBuffer }) {
@@ -216,7 +216,7 @@ async function sendMailBrevoHttp({ to, subject, html, icsBuffer, bcc }) {
     //html,
     //attachments,
     // Buenas prácticas de entregabilidad
-    headers: {
+    //headers: {
       //'X-Mailer': 'LatAm NMR School',
     //},
     // replyTo opcional si quieres que respondan a otro buzón
@@ -325,10 +325,10 @@ app.post('/nmrschool/register', async (req, res) => {
    });
   } catch (e) {
   console.error('[BREVO_HTTP] fallo:', e.message || e);
-  // Decide: o no rompes (200) o avisas 202
+  }// Decide: o no rompes (200) o avisas 202
   // Aquí, si prefieres NO romper la UX:
   // (no throw) -> sigue con res.json ok más abajo
-   }
+   
   
   // Envía correo
     //await sendMailSmtp({
@@ -374,13 +374,13 @@ app.get('/diag', (_req,res) => {
     nmrTplPath: NMR_TPL_PATH,
     hasSmtpUser: !!process.env.SMTP_USER,
     hasSmtpPass: !!process.env.SMTP_PASS,
+    hasBrevoApiKey: !!process.env.BREVO_API_KEY,
     mailFrom: process.env.MAIL_FROM || null,
     icsPublicUrl: typeof ICS_PUBLIC_URL !== 'undefined'
   };
   try { diag.tplExists = require('fs').existsSync(NMR_TPL_PATH); } catch {}
   res.json(diag);
-});
-
+ });
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
