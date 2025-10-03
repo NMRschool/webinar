@@ -149,22 +149,9 @@ function renderTemplate(tpl, vars) {
   );
 }
 
-// antes de tus rutas:
-app.get('/diag', (_req,res) => {
-  const diag = {
-    tplExists: false,
-    nmrTplPath: NMR_TPL_PATH,
-    hasSmtpUser: !!process.env.SMTP_USER,
-    hasSmtpPass: !!process.env.SMTP_PASS,
-    mailFrom: process.env.MAIL_FROM || null,
-    icsPublicUrl: typeof ICS_PUBLIC_URL !== 'undefined'
-  };
-  try { diag.tplExists = require('fs').existsSync(NMR_TPL_PATH); } catch {}
-  res.json(diag);
-});
 
 // Plantilla del correo de invitación (ajusta la ruta si la pones en otro lugar)
-const NMR_TPL_PATH = process.env.NMR_TPL_PATH || path.join(__dirname, 'correo_ticket.html');
+const NMR_TPL_PATH = process.env.NMR_TPL_PATH || path.join(__dirname, 'templates','correo_ticket.html');
 
 // Endpoint de registro
 app.post('/nmrschool/register', async (req, res) => {
@@ -191,7 +178,14 @@ app.post('/nmrschool/register', async (req, res) => {
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(NMR_EVENT.zoomUrl)}`;
 
     // Carga plantilla y reemplaza variables
-    const tpl = fs.readFileSync(NMR_TPL_PATH, 'utf8');
+    //const tpl = fs.readFileSync(NMR_TPL_PATH, 'utf8');
+    let tpl = '';
+    try {
+      tpl = fs.readFileSync(NMR_TPL_PATH, 'utf8');
+    } catch (e) {
+      console.error('No se pudo abrir la plantilla:', NMR_TPL_PATH, e.message);
+    return res.status(500).json({ ok:false, error:'Plantilla no encontrada', detail:NMR_TPL_PATH });
+    }
     const html = renderTemplate(tpl, {
       firstName,
       lastName,
@@ -250,6 +244,21 @@ app.get('/nmrschool/registrants.csv', (_, res) => {
 app.get('/', (_, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 app.get('/healthz', (_,res)=>res.send('ok'));
+
+// antes de tus rutas:
+app.get('/diag', (_req,res) => {
+  const diag = {
+    tplExists: false,
+    nmrTplPath: NMR_TPL_PATH,
+    hasSmtpUser: !!process.env.SMTP_USER,
+    hasSmtpPass: !!process.env.SMTP_PASS,
+    mailFrom: process.env.MAIL_FROM || null,
+    icsPublicUrl: typeof ICS_PUBLIC_URL !== 'undefined'
+  };
+  try { diag.tplExists = require('fs').existsSync(NMR_TPL_PATH); } catch {}
+  res.json(diag);
+});
+
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
