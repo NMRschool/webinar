@@ -112,12 +112,41 @@ function buildIcsWebinar() {
 }
 
 // SMTP (Gmail) — mismo esquema que ya usas con nodemailer y adjuntos .ics. :contentReference[oaicite:3]{index=3}
+// Reemplaza tu bloque trySend + llamada por esta función única (más simple y robusta para Brevo)
 async function sendMailSmtp({ to, bcc, subject, html, icsBuffer }) {
-  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const nodemailer = require('nodemailer');
+
+  const host = process.env.SMTP_HOST || 'smtp-relay.brevo.com';
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = process.env.SMTP_USER;  // ej. 987c96001@smtp-brevo.com
+  const pass = process.env.SMTP_PASS;  // tu API key de Brevo
   const from = process.env.MAIL_FROM || user;
-  if (!host || !user || !pass) throw new Error('SMTP faltante');
+
+  if (!host || !user || !pass) {
+    throw new Error('SMTP faltante: revisa SMTP_HOST, SMTP_USER, SMTP_PASS');
+  }
+
+  // 587 => STARTTLS (secure=false). 465 => TLS directo (secure=true)
+  const secure = port === 465;
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure,                 // Brevo recomienda 587 + STARTTLS => secure:false
+    auth: { user, pass },
+    // STARTTLS cuando secure=false
+    requireTLS: !secure,
+    // Fuerza IPv4 (evita rarezas IPv6 en algunos PaaS)
+    family: 4,
+    // Timeouts un poco más generosos
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 30000,
+    tls: {
+      minVersion: 'TLSv1.2',
+      servername: host,
+    },
+  });
 
   const attachments = icsBuffer ? [{
     filename: 'nmrschool-webinar.ics',
@@ -125,36 +154,22 @@ async function sendMailSmtp({ to, bcc, subject, html, icsBuffer }) {
     contentType: 'text/calendar; charset=utf-8; method=PUBLISH'
   }] : [];
 
-  const nodemailer = require('nodemailer');
-
-  const trySend = async (port, secure) => {
-    const transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure,                // false => STARTTLS en 587; true => TLS directo en 465
-      auth: { user, pass },
-      requireTLS: !secure,   // fuerza STARTTLS cuando secure=false
-      family: 4,             // <-- fuerza IPv4 (evita problemas IPv6)
-      connectionTimeout: 20000,
-      greetingTimeout: 20000,
-      socketTimeout: 20000,
-      tls: {
-        minVersion: 'TLSv1.2',
-        servername: host
-      }
-    });
-    return transporter.sendMail({ from, to, bcc, subject, html, attachments });
-  };
-
-  // 1) PRIMERO intenta 587 STARTTLS
-  try {
-    return await trySend(587, false);
-  } catch (e1) {
-    console.warn('[SMTP] 587/STARTTLS falló:', e1.code || e1.message);
-    // 2) FALLBACK: 465 TLS directo
-    return await trySend(465, true);
-  }
+  return transporter.sendMail({
+    from,
+    to,
+    bcc,
+    subject,
+    html,
+    attachments,
+    // Buenas prácticas de entregabilidad
+    headers: {
+      'X-Mailer': 'LatAm NMR School',
+    },
+    // replyTo opcional si quieres que respondan a otro buzón
+    // replyTo: 'contacto@nmrschool.com'
+  });
 }
+
 
 // Renderiza plantilla muy simple: {{clave}}
 function renderTemplate(tpl, vars) {
@@ -222,7 +237,30 @@ app.post('/nmrschool/register', async (req, res) => {
 
     // ICS
     const ics = buildIcsWebinar();
-
+    
+    // === Bloque parcheado para envío de correo ===
+  const DRY_RUN = process.env.DRY_RUN === '1';
+  try {
+    if (!DRY_RUN) {
+      await sendMailSmtp({
+        to: email,
+        bcc: process.env.MAIL_BCC ? process.env.MAIL_BCC.split(',') : undefined,
+        subject: process.env.MAIL_SUBJECT || 'Tu acceso — Webinar NMR School (Desacoplamiento en RMN)',
+        html,
+        icsBuffer: Buffer.from(ics, 'utf8')
+      });
+    } else {
+      console.warn('[DRY_RUN] Correo NO enviado. Se simula éxito.');
+    }
+  } catch (e) {
+    const transient = ['ETIMEDOUT', 'ECONNRESET', 'EAI_AGAIN'].includes(e.code) || e.command === 'CONN';
+    if (transient) {
+      console.warn('[SMTP] Error transitorio, registro guardado pero sin correo:', e.code || e.message);
+    } else {
+      throw e; // deja que el catch externo capture errores graves (credenciales malas, etc.)
+    }
+  }
+  // === Fin parche ===
     // Envía correo
     await sendMailSmtp({
       to: email,
